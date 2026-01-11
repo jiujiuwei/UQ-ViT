@@ -4,79 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .quantizer import ( UniformQuantizer, UniformQuantizer_DeMax)
 
-
-class QuantConv2d(nn.Conv2d):
-    """
-    Class to quantize weights of given convolutional layer
-    """
-    def __init__(self,   
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=1,
-                padding=0,
-                dilation=1,
-                groups=1,
-                bias=True,
-                input_quant_params={},
-                weight_quant_params={}):
-        super(QuantConv2d, self).__init__(in_channels=in_channels,
-                                          out_channels=out_channels,
-                                          kernel_size=kernel_size,
-                                          stride=stride,
-                                          padding=padding,
-                                          dilation=dilation,
-                                          groups=groups,
-                                          bias=bias)
-
-        input_quant_params_conv = deepcopy(input_quant_params)
-        input_quant_params_conv['n_bits'] = 8
-        self.input_quantizer = UniformQuantizer(**input_quant_params_conv)
-        self.weight_quantizer = UniformQuantizer(**weight_quant_params)
-
-        self.use_input_quant = False
-        self.use_weight_quant = False
-
-
-    def __repr__(self):
-        s = super(QuantConv2d, self).__repr__()
-        s = "(" + s + "input_quant={}, weight_quant={})".format(self.use_input_quant, self.use_weight_quant)
-        return s
-    
-    def set_quant_state(self, input_quant=False, weight_quant=False):
-        self.use_input_quant = input_quant
-        self.use_weight_quant = weight_quant
-
-    def set_initquant_state(self, inited=False):
-        self.input_quantizer.inited= inited
-        self.weight_quantizer.inited = inited
-
-
-    def forward(self, x):
-        """
-        using quantized weights to forward input x
-        """
-        if self.use_input_quant:
-            x = self.input_quantizer(x)
-
-        if self.use_weight_quant:
-            w = self.weight_quantizer(self.weight)
-        else:
-            w = self.weight
-
-        out = F.conv2d(
-            x, 
-            w, 
-            self.bias, 
-            self.stride, 
-            self.padding, 
-            self.dilation, 
-            self.groups
-        )
-
-        return out
-
-
 class QuantConv2d(nn.Conv2d):
     """
     Class to quantize weights of given convolutional layer
@@ -221,7 +148,76 @@ class QuantConv2d(nn.Conv2d):
                 )            
         return out
 
+class QuantConv2d(nn.Conv2d):
+    """
+    Class to quantize weights of given convolutional layer
+    """
+    def __init__(self,   
+                in_channels,
+                out_channels,
+                kernel_size,
+                stride=1,
+                padding=0,
+                dilation=1,
+                groups=1,
+                bias=True,
+                input_quant_params={},
+                weight_quant_params={}):
+        super(QuantConv2d, self).__init__(in_channels=in_channels,
+                                          out_channels=out_channels,
+                                          kernel_size=kernel_size,
+                                          stride=stride,
+                                          padding=padding,
+                                          dilation=dilation,
+                                          groups=groups,
+                                          bias=bias)
 
+        input_quant_params_conv = deepcopy(input_quant_params)
+        input_quant_params_conv['n_bits'] = 8
+        self.input_quantizer = UniformQuantizer(**input_quant_params_conv)
+        self.weight_quantizer = UniformQuantizer(**weight_quant_params)
+
+        self.use_input_quant = False
+        self.use_weight_quant = False
+
+
+    def __repr__(self):
+        s = super(QuantConv2d, self).__repr__()
+        s = "(" + s + "input_quant={}, weight_quant={})".format(self.use_input_quant, self.use_weight_quant)
+        return s
+    
+    def set_quant_state(self, input_quant=False, weight_quant=False):
+        self.use_input_quant = input_quant
+        self.use_weight_quant = weight_quant
+
+    def set_initquant_state(self, inited=False):
+        self.input_quantizer.inited= inited
+        self.weight_quantizer.inited = inited
+
+
+    def forward(self, x):
+        """
+        using quantized weights to forward input x
+        """
+        if self.use_input_quant:
+            x = self.input_quantizer(x)
+
+        if self.use_weight_quant:
+            w = self.weight_quantizer(self.weight)
+        else:
+            w = self.weight
+
+        out = F.conv2d(
+            x, 
+            w, 
+            self.bias, 
+            self.stride, 
+            self.padding, 
+            self.dilation, 
+            self.groups
+        )
+
+        return out
 
 class QuantLinear(nn.Linear):
     """
@@ -288,9 +284,8 @@ class QuantLinear(nn.Linear):
                     target_zero_point = torch.mean(act_zero_point)
                     target_min = -target_zero_point * target_delta
                     self.r = (act_delta / target_delta)**(1- self.alph) / (weight_delta)**self.alph
-                    
                     self.r = torch.ones_like(self.r).to(x.device) if self.alph == -1 else self.r
-                    
+                    self.b = act_min / self.r - target_min
                     self.b = torch.zeros_like(self.b).to(x.device) if self.alph == -1 else self.b
                     
                     self.input_quantizer.delta = target_delta
