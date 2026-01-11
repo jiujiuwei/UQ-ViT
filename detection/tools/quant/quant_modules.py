@@ -77,7 +77,6 @@ class QuantConv2d(nn.Conv2d):
         return out
 
 
-
 class QuantConv2d(nn.Conv2d):
     """
     Class to quantize weights of given convolutional layer
@@ -162,7 +161,7 @@ class QuantConv2d(nn.Conv2d):
                     target_zero_point = torch.mean(act_zero_point)
                     target_min = -target_zero_point * target_delta
                     self.r = (act_delta / target_delta)**(1- self.alph) / (weight_delta)**self.alph
-                    self.r = self.r
+                    
                     self.r = torch.ones_like(self.r).to(x.device) if self.alph == -1 else self.r
                     self.b = act_min / self.r - target_min 
                     self.b = torch.zeros_like(self.b).to(x.device) if self.alph == -1 else self.b
@@ -221,6 +220,7 @@ class QuantConv2d(nn.Conv2d):
                     self.groups
                 )            
         return out
+
 
 
 class QuantLinear(nn.Linear):
@@ -288,9 +288,11 @@ class QuantLinear(nn.Linear):
                     target_zero_point = torch.mean(act_zero_point)
                     target_min = -target_zero_point * target_delta
                     self.r = (act_delta / target_delta)**(1- self.alph) / (weight_delta)**self.alph
-                    self.r = self.r 
+                    
                     self.r = torch.ones_like(self.r).to(x.device) if self.alph == -1 else self.r
-                    self.b = act_min / self.r - target_min 
+                    
+                    self.b = torch.zeros_like(self.b).to(x.device) if self.alph == -1 else self.b
+                    
                     self.input_quantizer.delta = target_delta
                     self.input_quantizer.zero_point = target_zero_point
 
